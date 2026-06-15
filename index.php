@@ -181,9 +181,9 @@ try {
     </section>
 
     <!-- Footer -->
-    <footer style="text-align: center; padding: 40px 0; border-top: 1px solid rgba(0, 229, 255, 0.1); color: var(--text-muted); font-size: 0.85rem;">
+    <footer style="text-align: center; padding: 40px 0; border-top: 1px solid var(--border-glow); color: var(--text-muted); font-size: 0.85rem;">
         <p>&copy; <?php echo date('Y'); ?> CyberKavach Club. All rights reserved.</p>
-        <p style="font-size: 0.75rem; margin-top: 5px; color: rgba(0, 229, 255, 0.4);">Digital OS v1.0.0 (SQLite Edition)</p>
+        <p style="font-size: 0.75rem; margin-top: 5px; color: var(--text-muted);">Digital OS v1.0.0 (SQLite Edition)</p>
     </footer>
 </div>
 

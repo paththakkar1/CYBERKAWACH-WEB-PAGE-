@@ -411,20 +411,20 @@ include __DIR__ . '/includes/header.php';
                             <!-- Live Check-in Box -->
                             <?php if ($event['status'] === 'Approved' && $event['checkin_active']): ?>
                                 <?php if (has_role('Core')): ?>
-                                    <div style="margin-top: 15px; background: rgba(0, 255, 136, 0.04); border: 1px solid rgba(0, 255, 136, 0.2); padding: 12px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-                                        <span class="text-success" style="font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-                                            <i class="fa-solid fa-wifi animate-pulse"></i> Live Check-in Code:
+                                    <div style="margin-top: 15px; background: rgba(0, 0, 0, 0.02); border: 1px solid var(--border-glow); padding: 12px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                                        <span style="font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                            <i class="fa-solid fa-wifi"></i> Live Check-in Code:
                                         </span>
-                                        <span style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 800; color: var(--color-success); letter-spacing: 2px;">
+                                        <span style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 800; color: var(--color-primary); letter-spacing: 2px;">
                                             <?php echo sanitize($event['checkin_code']); ?>
                                         </span>
                                     </div>
                                 <?php elseif ($is_registered && $event['my_rsvp_status'] !== 'Attended'): ?>
-                                    <form action="events.php" method="POST" style="margin-top: 15px; background: rgba(0, 229, 255, 0.02); border: 1px dashed var(--color-primary); padding: 15px; border-radius: 4px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                    <form action="events.php" method="POST" style="margin-top: 15px; background: rgba(0, 0, 0, 0.02); border: 1px dashed var(--border-glow); padding: 15px; border-radius: 4px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
                                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                                         <input type="hidden" name="event_id" value="<?php echo $event['id']; ?>">
                                         <div style="display: flex; align-items: center; gap: 8px;">
-                                            <i class="fa-solid fa-satellite-dish text-cyan animate-pulse"></i>
+                                            <i class="fa-solid fa-satellite-dish"></i>
                                             <span style="font-size: 0.85rem; font-weight: bold; color: var(--color-primary);">Check-in is Live:</span>
                                         </div>
                                         <div style="display: flex; gap: 8px; flex-grow: 1; justify-content: flex-end; max-width: 320px;">
@@ -447,8 +447,8 @@ include __DIR__ . '/includes/header.php';
                                     $r_list = [];
                                 }
                                 ?>
-                                <div style="margin-top:20px; border-top: 1px dashed rgba(0, 229, 255, 0.2); padding-top: 15px;">
-                                    <h5 class="text-cyan" style="font-size:0.8rem; margin-bottom:10px;"><i class="fa-solid fa-users-gear"></i> RSVP Registry (<?php echo count($r_list); ?> Attendees)</h5>
+                                <div style="margin-top:20px; border-top: 1px dashed var(--border-glow); padding-top: 15px;">
+                                    <h5 style="font-size:0.8rem; margin-bottom:10px; color:var(--text-primary);"><i class="fa-solid fa-users-gear"></i> RSVP Registry (<?php echo count($r_list); ?> Attendees)</h5>
                                     <?php if (!empty($r_list)): ?>
                                         <div class="table-responsive">
                                             <table class="table-custom" style="margin-top:5px; font-size:0.8rem;">

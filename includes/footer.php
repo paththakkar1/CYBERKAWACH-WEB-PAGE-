@@ -1,6 +1,6 @@
 <?php if (is_logged_in()): ?>
         </main>
-        <footer style="padding: 20px 30px; text-align: center; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-glow); background: rgba(0,0,0,0.1);">
+        <footer style="padding: 20px 30px; text-align: center; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-glow); background: var(--bg-surface);">
             &copy; <?php echo date('Y'); ?> CyberKavach Club. Central OS Platform. All rights reserved.
         </footer>
     </div> <!-- /main-wrapper -->

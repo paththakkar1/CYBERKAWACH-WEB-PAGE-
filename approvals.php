@@ -241,11 +241,11 @@ include __DIR__ . '/includes/header.php';
                         <tbody>
                             <?php foreach ($pending_events as $pe): ?>
                                 <?php $is_my_event = intval($pe['created_by']) === $user_id; ?>
-                                <tr style="<?php echo $is_my_event ? 'opacity: 0.8; background: rgba(255,0,85,0.01);' : ''; ?>">
+                                <tr style="<?php echo $is_my_event ? 'background: rgba(0,0,0,0.03);' : ''; ?>">
                                     <td>
                                         <strong><?php echo sanitize($pe['organizer_name'] ?? 'Coordinator'); ?></strong>
                                         <?php if ($is_my_event): ?>
-                                            <div style="font-size:0.75rem; color:var(--color-accent); font-weight:600;">(Your Proposal)</div>
+                                            <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">(Your Proposal)</div>
                                         <?php endif; ?>
                                     </td>
                                     <td>
