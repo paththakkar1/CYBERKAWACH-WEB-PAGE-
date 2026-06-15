@@ -33,6 +33,9 @@ try {
             max_participants INTEGER NOT NULL,
             points_reward INTEGER DEFAULT 0,
             created_by INTEGER,
+            status TEXT NOT NULL DEFAULT 'Approved',
+            checkin_code TEXT,
+            checkin_active INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
         );
@@ -117,6 +120,49 @@ try {
             ip_address TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        );
+        
+        CREATE TABLE IF NOT EXISTS certificates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            event_id INTEGER,
+            quiz_id INTEGER,
+            uuid TEXT NOT NULL UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE SET NULL
+        );
+        
+        CREATE TABLE IF NOT EXISTS badges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL,
+            icon TEXT NOT NULL,
+            color TEXT NOT NULL
+        );
+        
+        CREATE TABLE IF NOT EXISTS user_badges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            badge_id INTEGER NOT NULL,
+            awarded_by INTEGER,
+            awarded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (badge_id) REFERENCES badges(id) ON DELETE CASCADE,
+            FOREIGN KEY (awarded_by) REFERENCES users(id) ON DELETE SET NULL,
+            UNIQUE(user_id, badge_id)
+        );
+        
+        CREATE TABLE IF NOT EXISTS spotlights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            created_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
         );
     ");
 
@@ -291,6 +337,41 @@ try {
         $db->exec("INSERT INTO audit_logs (action, details) VALUES ('System Init', 'Database initialized and seeded successfully')");
     }
 
+    // Dynamic schema checks for existing database (ALTER TABLE)
+    try {
+        $cols = [];
+        $stmtCols = $db->query("PRAGMA table_info(events)");
+        while ($col = $stmtCols->fetch()) {
+            $cols[] = $col['name'];
+        }
+        if (!in_array('status', $cols)) {
+            $db->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'Approved'");
+        }
+        if (!in_array('checkin_code', $cols)) {
+            $db->exec("ALTER TABLE events ADD COLUMN checkin_code TEXT");
+        }
+        if (!in_array('checkin_active', $cols)) {
+            $db->exec("ALTER TABLE events ADD COLUMN checkin_active INTEGER DEFAULT 0");
+        }
+    } catch (PDOException $e) {
+        // Fail silently
+    }
+
+    // Seed default achievements/badges if table is empty
+    try {
+        $badgeCount = $db->query("SELECT COUNT(*) FROM badges")->fetchColumn();
+        if ($badgeCount == 0) {
+            $stmtBadge = $db->prepare("INSERT INTO badges (name, description, icon, color) VALUES (?, ?, ?, ?)");
+            $stmtBadge->execute(['Phishing Defender', 'Passed the Phishing Defense Essentials training lab.', 'fa-shield-halved', 'text-cyan']);
+            $stmtBadge->execute(['Keymaster', 'Passed the Password Security & 2FA training lab.', 'fa-key', 'text-purple']);
+            $stmtBadge->execute(['Web Guard', 'Passed the Web Application Security training lab.', 'fa-code-branch', 'text-pink']);
+            $stmtBadge->execute(['Event Champion', 'Attended your first CyberKavach event workshop.', 'fa-calendar-check', 'text-success']);
+            $stmtBadge->execute(['Elite Guardian', 'Acquired a score of 500+ XP on the global leaderboard.', 'fa-ranking-star', 'text-warning']);
+        }
+    } catch (PDOException $e) {
+        // Fail silently
+    }
+
 } catch (PDOException $e) {
     die("Database Connection / Setup Failed: " . $e->getMessage());
 }
@@ -309,6 +390,106 @@ function log_event($user_id, $action, $details) {
         $stmt->execute([$user_id, $action, $details, $ip]);
     } catch (PDOException $e) {
         // Silently fail logging to prevent site crashes
+    }
+}
+
+/**
+ * Award a digital badge to a user
+ * @param int $user_id
+ * @param string $badge_name
+ * @param int|null $awarded_by
+ * @return bool
+ */
+function award_badge($user_id, $badge_name, $awarded_by = null) {
+    global $db;
+    try {
+        // Get badge ID
+        $stmtB = $db->prepare("SELECT id FROM badges WHERE name = ? LIMIT 1");
+        $stmtB->execute([$badge_name]);
+        $badge_id = $stmtB->fetchColumn();
+        if (!$badge_id) return false;
+
+        // Check if user already has this badge
+        $stmtCheck = $db->prepare("SELECT COUNT(*) FROM user_badges WHERE user_id = ? AND badge_id = ?");
+        $stmtCheck->execute([$user_id, $badge_id]);
+        if ($stmtCheck->fetchColumn() > 0) return false;
+
+        // Award badge
+        $stmtAward = $db->prepare("INSERT INTO user_badges (user_id, badge_id, awarded_by) VALUES (?, ?, ?)");
+        $stmtAward->execute([$user_id, $badge_id, $awarded_by]);
+
+        log_event($user_id, 'Badge Awarded', "Earned the '$badge_name' badge");
+        return true;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+/**
+ * Generate a secure dynamic certificate for a user
+ * @param int $user_id
+ * @param int|null $event_id
+ * @param int|null $quiz_id
+ * @return string|bool The UUID string if generated, false otherwise
+ */
+function generate_certificate($user_id, $event_id = null, $quiz_id = null) {
+    global $db;
+    try {
+        if ($event_id === null && $quiz_id === null) return false;
+
+        // Check if certificate already exists
+        if ($event_id !== null) {
+            $stmtCheck = $db->prepare("SELECT uuid FROM certificates WHERE user_id = ? AND event_id = ?");
+            $stmtCheck->execute([$user_id, $event_id]);
+            $existing = $stmtCheck->fetchColumn();
+            if ($existing) return $existing;
+        } else {
+            $stmtCheck = $db->prepare("SELECT uuid FROM certificates WHERE user_id = ? AND quiz_id = ?");
+            $stmtCheck->execute([$user_id, $quiz_id]);
+            $existing = $stmtCheck->fetchColumn();
+            if ($existing) return $existing;
+        }
+
+        // Generate UUID
+        $uuid = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
+
+        // Insert certificate
+        $stmtCert = $db->prepare("INSERT INTO certificates (user_id, event_id, quiz_id, uuid) VALUES (?, ?, ?, ?)");
+        $stmtCert->execute([$user_id, $event_id, $quiz_id, $uuid]);
+
+        // Award badge: check if first event attended
+        if ($event_id !== null) {
+            award_badge($user_id, 'Event Champion');
+        }
+
+        log_event($user_id, 'Certificate Generated', "Verification UUID: $uuid");
+        return $uuid;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+/**
+ * Check and award XP milestone badges
+ * @param int $user_id
+ */
+function check_xp_milestones($user_id) {
+    global $db;
+    try {
+        $stmt = $db->prepare("SELECT points FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $xp = $stmt->fetchColumn();
+        if ($xp >= 500) {
+            award_badge($user_id, 'Elite Guardian');
+        }
+    } catch (PDOException $e) {
+        // Fail silently
     }
 }
 ?>

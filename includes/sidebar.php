@@ -62,6 +62,15 @@ $initials = substr($initials, 0, 2);
             </a>
         </li>
 
+        <?php if ($user_role === 'Core' || $user_role === 'Admin'): ?>
+            <li class="sidebar-item <?php echo $current_page === 'approvals.php' ? 'active' : ''; ?>">
+                <a href="approvals.php" class="sidebar-link text-purple">
+                    <i class="fa-solid fa-square-check"></i>
+                    <span>Approvals Board</span>
+                </a>
+            </li>
+        <?php endif; ?>
+
         <?php if ($user_role === 'Admin'): ?>
             <li class="sidebar-item <?php echo $current_page === 'admin.php' ? 'active' : ''; ?>">
                 <a href="admin.php" class="sidebar-link text-pink">

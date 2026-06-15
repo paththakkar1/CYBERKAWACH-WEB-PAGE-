@@ -12,9 +12,13 @@ $user_name = $_SESSION['user_name'];
 
 // Fetch shared data: Announcements
 $announcements = [];
+$spotlights = [];
 try {
     $stmt = $db->query("SELECT a.*, u.name as author_name FROM announcements a LEFT JOIN users u ON a.created_by = u.id ORDER BY a.created_at DESC LIMIT 5");
     $announcements = $stmt->fetchAll();
+    
+    $stmtSpot = $db->query("SELECT s.*, u.name as nominee_name FROM spotlights s JOIN users u ON s.user_id = u.id ORDER BY s.created_at DESC LIMIT 3");
+    $spotlights = $stmtSpot->fetchAll();
 } catch (PDOException $e) {
     // Fail silently
 }
@@ -49,6 +53,10 @@ if ($user_role === 'Admin') {
         $upcoming_events_count = $db->query("SELECT COUNT(*) FROM events WHERE date >= date('now')")->fetchColumn();
         $pending_tickets = $db->query("SELECT COUNT(*) FROM tickets WHERE status = 'Open'")->fetchColumn();
         $total_quizzes = $db->query("SELECT COUNT(*) FROM quizzes")->fetchColumn();
+        
+        $pending_users_app = $db->query("SELECT COUNT(*) FROM users WHERE status = 'Pending'")->fetchColumn();
+        $pending_events_app = $db->query("SELECT COUNT(*) FROM events WHERE status = 'Pending Approval'")->fetchColumn();
+        $pending_approvals_count = $pending_users_app + $pending_events_app;
         
         // Upcoming events details
         $stmtEv = $db->query("SELECT * FROM events WHERE date >= date('now') ORDER BY date ASC LIMIT 5");
@@ -107,6 +115,36 @@ if ($user_role === 'Admin') {
         ");
         $stmtRecQ->execute([$user_id]);
         $rec_quizzes = $stmtRecQ->fetchAll();
+
+        // Level & Progress bar calculations
+        $level = 1;
+        $next_level_xp = 100;
+        $prev_level_xp = 0;
+        if ($my_points >= 500) {
+            $level = 4;
+            $next_level_xp = 1000;
+            $prev_level_xp = 500;
+        } elseif ($my_points >= 250) {
+            $level = 3;
+            $next_level_xp = 500;
+            $prev_level_xp = 250;
+        } elseif ($my_points >= 100) {
+            $level = 2;
+            $next_level_xp = 250;
+            $prev_level_xp = 100;
+        }
+        $level_progress = (($my_points - $prev_level_xp) / ($next_level_xp - $prev_level_xp)) * 100;
+        $level_progress = max(0, min(100, $level_progress));
+
+        // Fetch user badges
+        $stmtMyBadges = $db->prepare("
+            SELECT b.* FROM user_badges ub 
+            JOIN badges b ON ub.badge_id = b.id 
+            WHERE ub.user_id = ?
+        ");
+        $stmtMyBadges->execute([$user_id]);
+        $my_badges = $stmtMyBadges->fetchAll();
+        
     } catch (PDOException $e) {
         set_flash_message('error', 'Failed to fetch dashboard metrics.');
     }
@@ -169,13 +207,13 @@ include __DIR__ . '/includes/header.php';
             </div>
             <i class="fa-solid fa-envelope-open-text stat-icon"></i>
         </div>
-        <div class="stat-card">
+        <a href="approvals.php" class="stat-card" style="text-decoration:none; display:flex; border-color:rgba(112,0,255,0.15);">
             <div class="stat-info">
-                <h3>Security Quizzes</h3>
-                <div class="stat-value text-purple"><?php echo $total_quizzes; ?></div>
+                <h3>Pending Approvals</h3>
+                <div class="stat-value text-purple"><?php echo $pending_approvals_count; ?></div>
             </div>
-            <i class="fa-solid fa-graduation-cap stat-icon"></i>
-        </div>
+            <i class="fa-solid fa-square-check stat-icon text-purple"></i>
+        </a>
 
     <?php else: ?>
         <div class="stat-card">
@@ -353,6 +391,62 @@ include __DIR__ . '/includes/header.php';
             </div>
 
         <?php else: ?>
+            <!-- MEMBER VIEW: Rank, Spotlight, Badges & Events -->
+            
+            <!-- Rank Progression Panel -->
+            <div class="card" style="margin-bottom: 30px; border-color: var(--border-glow);">
+                <h3 class="card-title"><i class="fa-solid fa-ranking-star"></i> Rank Progress</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:8px;">
+                    <span>Level <?php echo $level; ?>: <strong><?php echo sanitize($user_role); ?></strong></span>
+                    <span style="color:#000000; font-weight:bold;"><?php echo $my_points; ?> / <?php echo $next_level_xp; ?> XP</span>
+                </div>
+                <div style="width:100%; height:12px; background:rgba(0,0,0,0.08); border:1px solid var(--border-glow); border-radius:6px; overflow:hidden; position:relative;">
+                    <div style="width:<?php echo $level_progress; ?>%; height:100%; background:#000000; border-radius:5px; transition:width 1s ease;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-top:8px;">
+                    <span><?php echo $prev_level_xp; ?> XP</span>
+                    <span>Next Rank: <?php echo $next_level_xp - $my_points; ?> XP Required</span>
+                </div>
+            </div>
+
+            <!-- Member Spotlight Showcase -->
+            <?php if (!empty($spotlights)): ?>
+                <div class="card" style="margin-bottom: 30px; border-color: var(--border-glow);">
+                    <h3 class="card-title"><i class="fa-solid fa-trophy"></i> Member Spotlight</h3>
+                    <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+                        <?php foreach ($spotlights as $spot): ?>
+                            <div style="background:rgba(0,0,0,0.02); border-left:3px solid #000000; padding:12px; border-radius: 0 4px 4px 0;">
+                                <div style="font-family:var(--font-heading); font-size:0.9rem; color:#000000; font-weight:700;">
+                                    <?php echo sanitize($spot['nominee_name']); ?>
+                                </div>
+                                <div style="font-size:0.8rem; font-weight:bold; color:#000000; margin:3px 0;"><?php echo sanitize($spot['title']); ?></div>
+                                <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;"><?php echo sanitize($spot['reason']); ?></p>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Earned Achievements Vault -->
+            <div class="card" style="margin-bottom: 30px; border-color: var(--border-glow);">
+                <h3 class="card-title"><i class="fa-solid fa-award"></i> Digital Badge Vault</h3>
+                <?php if (!empty($my_badges)): ?>
+                    <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:15px;">
+                        <?php foreach ($my_badges as $bdg): ?>
+                            <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-glow); padding:10px 15px; border-radius:4px; display:flex; align-items:center; gap:10px; min-width:180px;" title="<?php echo sanitize($bdg['description']); ?>">
+                                <i class="fa-solid <?php echo sanitize($bdg['icon']); ?>" style="font-size:1.4rem; color:#000000;"></i>
+                                <div>
+                                    <div style="font-size:0.85rem; font-weight:bold;"><?php echo sanitize($bdg['name']); ?></div>
+                                    <div style="font-size:0.7rem; color:var(--text-muted);">Badge Earned</div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p style="color:var(--text-muted); font-size:0.85rem; margin-top:10px;">Sharpen your skills. Deploy labs or join workshops to unlock achievements.</p>
+                <?php endif; ?>
+            </div>
+
             <!-- MEMBER VIEW: My registered events & announcements -->
             <div class="card card-success" style="margin-bottom: 30px;">
                 <h3 class="card-title text-success"><i class="fa-solid fa-user-check"></i> Registered Workshops</h3>

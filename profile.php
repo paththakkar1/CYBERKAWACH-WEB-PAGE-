@@ -20,6 +20,23 @@ try {
         set_flash_message('error', 'User details not found.');
         redirect('dashboard.php');
     }
+    
+    // Fetch user badges
+    $stmtB = $db->prepare("SELECT b.* FROM user_badges ub JOIN badges b ON ub.badge_id = b.id WHERE ub.user_id = ?");
+    $stmtB->execute([$user_id]);
+    $my_badges = $stmtB->fetchAll();
+    
+    // Fetch user certificates
+    $stmtC = $db->prepare("
+        SELECT c.*, e.title as event_title, q.title as quiz_title 
+        FROM certificates c 
+        LEFT JOIN events e ON c.event_id = e.id 
+        LEFT JOIN quizzes q ON c.quiz_id = q.id 
+        WHERE c.user_id = ?
+        ORDER BY c.created_at DESC
+    ");
+    $stmtC->execute([$user_id]);
+    $my_certificates = $stmtC->fetchAll();
 } catch (PDOException $e) {
     set_flash_message('error', 'Database error.');
     redirect('dashboard.php');
@@ -113,12 +130,12 @@ include __DIR__ . '/includes/header.php';
                 
                 <div class="form-group">
                     <label class="form-label">System Role Privilege</label>
-                    <input type="text" class="form-control" value="<?php echo sanitize($user['role']); ?>" readonly style="background: rgba(0,0,0,0.2); border-color: transparent; font-weight: bold; color: var(--color-primary);">
+                    <input type="text" class="form-control" value="<?php echo sanitize($user['role']); ?>" readonly style="background: var(--bg-surface-elevated); border-color: var(--border-glow); font-weight: bold; color: var(--color-primary);">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Total Experience Points</label>
-                    <input type="text" class="form-control" value="<?php echo sanitize($user['points']); ?> XP" readonly style="background: rgba(0,0,0,0.2); border-color: transparent; font-weight: bold; color: var(--color-success);">
+                    <input type="text" class="form-control" value="<?php echo sanitize($user['points']); ?> XP" readonly style="background: var(--bg-surface-elevated); border-color: var(--border-glow); font-weight: bold; color: var(--color-primary);">
                 </div>
 
                 <div class="form-group">
@@ -172,6 +189,49 @@ include __DIR__ . '/includes/header.php';
                     <i class="fa-solid fa-shield-halved"></i> Rotate Passphrase
                 </button>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 30px; border-color: var(--border-glow);">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px;">
+        <!-- Achievements Column -->
+        <div>
+            <h4 style="font-size:0.95rem; border-bottom:1px solid var(--border-glow); padding-bottom:8px; margin-bottom:15px; color:#000000;">
+                <i class="fa-solid fa-award"></i> Badges
+            </h4>
+            <?php if (!empty($my_badges)): ?>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <?php foreach ($my_badges as $bdg): ?>
+                        <span style="font-size:0.75rem; padding: 6px 10px; display:inline-flex; align-items:center; gap:6px; background: var(--bg-surface-elevated); border: 1px solid var(--border-glow); border-radius:4px; color:#000000;" title="<?php echo sanitize($bdg['description']); ?>">
+                            <i class="fa-solid <?php echo sanitize($bdg['icon']); ?>" style="color:#000000;"></i>
+                            <?php echo sanitize($bdg['name']); ?>
+                        </span>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <p style="color:var(--text-muted); font-size:0.8rem;">No achievements unlocked yet.</p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Certificates Column -->
+        <div>
+            <h4 style="font-size:0.95rem; border-bottom:1px solid var(--border-glow); padding-bottom:8px; margin-bottom:15px; color:#000000;">
+                <i class="fa-solid fa-graduation-cap"></i> Certificate Vault
+            </h4>
+            <?php if (!empty($my_certificates)): ?>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <?php foreach ($my_certificates as $crt): ?>
+                        <?php $cert_title = !empty($crt['event_title']) ? $crt['event_title'] : $crt['quiz_title']; ?>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; background:var(--bg-surface-elevated); padding:8px 12px; border:1px solid var(--border-glow); border-radius:4px;">
+                            <span style="font-weight:600; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;"><?php echo sanitize($cert_title); ?></span>
+                            <a href="certificate.php?uuid=<?php echo $crt['uuid']; ?>" target="_blank" style="font-weight:bold; font-size:0.75rem; color:#000000;"><i class="fa-solid fa-arrow-up-right-from-square"></i> View</a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <p style="color:var(--text-muted); font-size:0.8rem;">No certificates generated yet.</p>
+            <?php endif; ?>
         </div>
     </div>
 </div>

@@ -33,11 +33,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_event'])) {
             $error = 'Please fill all fields and provide a valid capacity.';
         } else {
             try {
-                $stmt = $db->prepare("INSERT INTO events (title, description, date, time, location, max_participants, points_reward, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$title, $description, $date, $time, $location, $max_participants, $points_reward, $user_id]);
+                $status = ($user_role === 'Admin') ? 'Approved' : 'Pending Approval';
+                $stmt = $db->prepare("INSERT INTO events (title, description, date, time, location, max_participants, points_reward, created_by, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$title, $description, $date, $time, $location, $max_participants, $points_reward, $user_id, $status]);
                 
-                log_event($user_id, 'Create Event', "Created event: $title (Points: $points_reward)");
-                set_flash_message('success', 'Security workshop scheduled successfully.');
+                log_event($user_id, 'Create Event', "Created event: $title (Status: $status, Points: $points_reward)");
+                
+                if ($status === 'Approved') {
+                    set_flash_message('success', 'Security workshop scheduled successfully.');
+                } else {
+                    set_flash_message('warning', 'Workshop proposal submitted! It must be co-signed/approved by another coordinator before going live.');
+                }
                 redirect('events.php');
             } catch (PDOException $e) {
                 $error = 'Failed to schedule event.';
@@ -98,6 +104,35 @@ if (isset($_GET['mark_attendance']) && has_role('Core')) {
                 $db->rollBack();
             }
             set_flash_message('error', 'Failed to update attendance.');
+        }
+    }
+    redirect('events.php');
+}
+
+// Toggle Live Check-in (Admin & Core only)
+if (isset($_GET['toggle_checkin']) && has_role('Core')) {
+    $event_id = intval($_GET['toggle_checkin']);
+    $active_val = intval($_GET['status'] ?? 0);
+    $csrf_token = $_GET['csrf_token'] ?? '';
+    
+    if (!verify_csrf_token($csrf_token)) {
+        set_flash_message('error', 'Security check failed.');
+    } else {
+        try {
+            if ($active_val === 1) {
+                $code = strval(rand(100000, 999999));
+                $stmt = $db->prepare("UPDATE events SET checkin_active = 1, checkin_code = ? WHERE id = ?");
+                $stmt->execute([$code, $event_id]);
+                log_event($user_id, 'Check-in Activated', "Activated live check-in for event ID $event_id. Code: $code");
+                set_flash_message('success', "Live check-in activated! Passcode: $code");
+            } else {
+                $stmt = $db->prepare("UPDATE events SET checkin_active = 0, checkin_code = NULL WHERE id = ?");
+                $stmt->execute([$event_id]);
+                log_event($user_id, 'Check-in Deactivated', "Deactivated live check-in for event ID $event_id");
+                set_flash_message('success', 'Live check-in deactivated.');
+            }
+        } catch (PDOException $e) {
+            set_flash_message('error', 'Failed to toggle check-in status.');
         }
     }
     redirect('events.php');
@@ -196,17 +231,92 @@ if (isset($_GET['cancel_rsvp'])) {
     redirect('events.php');
 }
 
+// 3. Submit Passcode Live Check-in
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_checkin'])) {
+    $event_id = intval($_POST['event_id']);
+    $code_submitted = trim($_POST['checkin_passcode'] ?? '');
+    $csrf_token = $_POST['csrf_token'] ?? '';
+    
+    if (!verify_csrf_token($csrf_token)) {
+        set_flash_message('error', 'Security check failed.');
+    } else {
+        try {
+            $stmtEv = $db->prepare("SELECT * FROM events WHERE id = ? LIMIT 1");
+            $stmtEv->execute([$event_id]);
+            $event = $stmtEv->fetch();
+            
+            if (!$event) {
+                set_flash_message('error', 'Event not found.');
+            } elseif (intval($event['checkin_active']) !== 1 || empty($event['checkin_code'])) {
+                set_flash_message('error', 'Live check-in is not active for this event.');
+            } elseif ($event['checkin_code'] !== $code_submitted) {
+                set_flash_message('error', 'Invalid check-in passcode.');
+            } else {
+                $db->beginTransaction();
+                
+                $stmtCheck = $db->prepare("SELECT id, status FROM registrations WHERE user_id = ? AND event_id = ?");
+                $stmtCheck->execute([$user_id, $event_id]);
+                $reg = $stmtCheck->fetch();
+                
+                $points_reward = intval($event['points_reward']);
+                
+                if ($reg) {
+                    if ($reg['status'] === 'Attended') {
+                        $db->rollBack();
+                        set_flash_message('info', 'You have already checked in for this event!');
+                        redirect('events.php');
+                    } else {
+                        $stmtUpdate = $db->prepare("UPDATE registrations SET status = 'Attended' WHERE id = ?");
+                        $stmtUpdate->execute([$reg['id']]);
+                        
+                        $stmtPoints = $db->prepare("UPDATE users SET points = points + ? WHERE id = ?");
+                        $stmtPoints->execute([$points_reward, $user_id]);
+                    }
+                } else {
+                    $stmtInsert = $db->prepare("INSERT INTO registrations (user_id, event_id, status) VALUES (?, ?, 'Attended')");
+                    $stmtInsert->execute([$user_id, $event_id]);
+                    
+                    $stmtPoints = $db->prepare("UPDATE users SET points = points + ? WHERE id = ?");
+                    $stmtPoints->execute([$points_reward, $user_id]);
+                }
+                
+                // Auto generate certificate
+                generate_certificate($user_id, $event_id, null);
+                
+                // Award Event Champion badge
+                award_badge($user_id, 'Event Champion');
+                
+                // Check milestones
+                check_xp_milestones($user_id);
+                
+                $db->commit();
+                
+                log_event($user_id, 'Live Check-in Success', "Checked in to event ID $event_id. Points: +$points_reward XP");
+                set_flash_message('success', "Check-in successful! +{$points_reward} XP. Certificate generated.");
+            }
+        } catch (PDOException $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            set_flash_message('error', 'Failed to process check-in.');
+        }
+    }
+    redirect('events.php');
+}
+
 // -------------------------------------------------------------
 // RENDER DATA FETCH
 // -------------------------------------------------------------
-// Fetch all events with RSVPs counted
+// Fetch all events (Only approved ones for members, all for core/admin)
 try {
+    $where_clause = has_role('Core') ? "" : "WHERE e.status = 'Approved'";
     $stmtEvents = $db->query("
         SELECT e.*, u.name as organizer_name,
         (SELECT COUNT(*) FROM registrations WHERE event_id = e.id) as rsvp_count,
         (SELECT status FROM registrations WHERE event_id = e.id AND user_id = " . intval($user_id) . ") as my_rsvp_status
         FROM events e 
         LEFT JOIN users u ON e.created_by = u.id 
+        $where_clause
         ORDER BY e.date ASC, e.time ASC
     ");
     $events = $stmtEvents->fetchAll();
@@ -242,6 +352,8 @@ include __DIR__ . '/includes/header.php';
                                     <span class="badge badge-member">+<?php echo $event['points_reward']; ?> XP</span>
                                     <?php if ($is_past): ?>
                                         <div class="badge badge-status-suspended" style="margin-top: 5px; font-size:0.6rem;">Archived</div>
+                                    <?php elseif ($event['status'] === 'Pending Approval'): ?>
+                                        <div class="badge badge-status-pending" style="margin-top: 5px; font-size:0.6rem;">Proposed</div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -267,12 +379,20 @@ include __DIR__ . '/includes/header.php';
                                     <?php endif; ?>
                                 </div>
                                 
-                                <div style="display: flex; gap: 10px;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
                                     <?php if (has_role('Core')): ?>
+                                        <!-- Check-in Toggles for Coordinator -->
+                                        <?php if ($event['status'] === 'Approved'): ?>
+                                            <?php if ($event['checkin_active']): ?>
+                                                <a href="events.php?toggle_checkin=<?php echo $event['id']; ?>&status=0&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-danger" style="padding:6px 12px; font-size:0.75rem;"><i class="fa-solid fa-wifi-slash"></i> Close Check-in</a>
+                                            <?php else: ?>
+                                                <a href="events.php?toggle_checkin=<?php echo $event['id']; ?>&status=1&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-success" style="padding:6px 12px; font-size:0.75rem;"><i class="fa-solid fa-wifi"></i> Start Check-in</a>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
                                         <a href="events.php?delete=<?php echo $event['id']; ?>&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-danger" style="padding:6px 12px; font-size:0.75rem;" onclick="return confirm('Delete event? Registered members will be cancelled.');"><i class="fa-solid fa-trash-can"></i> Delete</a>
                                     <?php endif; ?>
                                     
-                                    <?php if (!$is_past): ?>
+                                    <?php if (!$is_past && $event['status'] === 'Approved'): ?>
                                         <?php if ($is_registered): ?>
                                             <?php if ($event['my_rsvp_status'] !== 'Attended'): ?>
                                                 <a href="events.php?cancel_rsvp=<?php echo $event['id']; ?>&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-danger" style="padding:6px 12px; font-size:0.75rem;"><i class="fa-solid fa-xmark"></i> Cancel RSVP</a>
@@ -287,6 +407,33 @@ include __DIR__ . '/includes/header.php';
                                     <?php endif; ?>
                                 </div>
                             </div>
+
+                            <!-- Live Check-in Box -->
+                            <?php if ($event['status'] === 'Approved' && $event['checkin_active']): ?>
+                                <?php if (has_role('Core')): ?>
+                                    <div style="margin-top: 15px; background: rgba(0, 255, 136, 0.04); border: 1px solid rgba(0, 255, 136, 0.2); padding: 12px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                                        <span class="text-success" style="font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                            <i class="fa-solid fa-wifi animate-pulse"></i> Live Check-in Code:
+                                        </span>
+                                        <span style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 800; color: var(--color-success); letter-spacing: 2px;">
+                                            <?php echo sanitize($event['checkin_code']); ?>
+                                        </span>
+                                    </div>
+                                <?php elseif ($is_registered && $event['my_rsvp_status'] !== 'Attended'): ?>
+                                    <form action="events.php" method="POST" style="margin-top: 15px; background: rgba(0, 229, 255, 0.02); border: 1px dashed var(--color-primary); padding: 15px; border-radius: 4px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="event_id" value="<?php echo $event['id']; ?>">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <i class="fa-solid fa-satellite-dish text-cyan animate-pulse"></i>
+                                            <span style="font-size: 0.85rem; font-weight: bold; color: var(--color-primary);">Check-in is Live:</span>
+                                        </div>
+                                        <div style="display: flex; gap: 8px; flex-grow: 1; justify-content: flex-end; max-width: 320px;">
+                                            <input type="text" name="checkin_passcode" placeholder="6-Digit Passcode" class="form-control" style="padding: 6px 12px; font-size: 0.8rem; width: 140px; text-align: center;" required>
+                                            <button type="submit" name="submit_checkin" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem;">Submit</button>
+                                        </div>
+                                    </form>
+                                <?php endif; ?>
+                            <?php endif; ?>
                             
                             <!-- Attendance Manager Section for Core / Admin -->
                             <?php if (has_role('Core')): ?>
@@ -313,7 +460,7 @@ include __DIR__ . '/includes/header.php';
                                                         <th>Mark Attendance</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody>
+                                                <tbody id="attendance-tbody-<?php echo $event['id']; ?>">
                                                     <?php foreach ($r_list as $reg): ?>
                                                         <tr>
                                                             <td><strong><?php echo sanitize($reg['attendee_name']); ?></strong></td>
@@ -412,5 +559,74 @@ include __DIR__ . '/includes/header.php';
         </div>
     <?php endif; ?>
 </div>
+
+<?php if (has_role('Core')): ?>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const activeEvents = [
+        <?php 
+        $active_ids = [];
+        foreach ($events as $ev) {
+            if ($ev['status'] === 'Approved' && $ev['checkin_active']) {
+                $active_ids[] = intval($ev['id']);
+            }
+        }
+        echo implode(',', $active_ids);
+        ?>
+    ];
+    
+    if (activeEvents.length > 0) {
+        setInterval(function() {
+            activeEvents.forEach(function(eventId) {
+                fetch('api_attendance.php?event_id=' + eventId)
+                    .then(response => response.json())
+                    .then(data => {
+                        const tbody = document.getElementById('attendance-tbody-' + eventId);
+                        if (!tbody) return;
+                        
+                        let html = '';
+                        if (data && data.length > 0) {
+                            data.forEach(function(reg) {
+                                const statusClass = reg.status.toLowerCase();
+                                html += `<tr>
+                                    <td><strong>${escapeHtml(reg.attendee_name)}</strong></td>
+                                    <td style="color:var(--text-muted); font-size:0.75rem;">${escapeHtml(reg.attendee_email)}</td>
+                                    <td>
+                                        <span class="badge badge-status-${statusClass}" style="font-size:0.6rem; padding: 2px 4px;">
+                                            ${escapeHtml(reg.status)}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div style="display:flex; gap:5px;">
+                                            <a href="events.php?mark_attendance=${reg.id}&status=Attended&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-success" style="padding: 3px 6px; font-size:0.65rem;" title="Mark Attended"><i class="fa-solid fa-check"></i> Attended</a>
+                                            <a href="events.php?mark_attendance=${reg.id}&status=Absent&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-danger" style="padding: 3px 6px; font-size:0.65rem;" title="Mark Absent"><i class="fa-solid fa-user-xmark"></i> Absent</a>
+                                        </div>
+                                    </td>
+                                </tr>`;
+                            });
+                        } else {
+                            html = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No member registrations recorded for this workshop yet.</td></tr>';
+                        }
+                        tbody.innerHTML = html;
+                    })
+                    .catch(err => console.error(err));
+            });
+        }, 5000);
+    }
+    
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+});
+</script>
+<?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
