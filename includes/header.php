@@ -119,7 +119,8 @@ if (is_logged_in()) {
     <!-- Public Header if on landing page or auth pages -->
     <?php if (basename($_SERVER['PHP_SELF']) !== 'index.php' && 
               basename($_SERVER['PHP_SELF']) !== 'login.php' && 
-              basename($_SERVER['PHP_SELF']) !== 'register.php'): ?>
+              basename($_SERVER['PHP_SELF']) !== 'register.php' &&
+              basename($_SERVER['PHP_SELF']) !== 'verify_certificate.php'): ?>
         <?php redirect('login.php'); ?>
     <?php endif; ?>
 <?php endif; ?>
