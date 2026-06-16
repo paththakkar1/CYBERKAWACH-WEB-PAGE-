@@ -17,6 +17,10 @@ if (is_logged_in()) {
         );
     }
     
+    // Clear JWT cookies
+    setcookie('cyberkavach_jwt', '', time() - 3600, '/');
+    setcookie('cyberkavach_refresh', '', time() - 3600, '/');
+    
     // Destroy the session
     session_destroy();
 }

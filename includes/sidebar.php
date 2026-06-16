@@ -62,6 +62,13 @@ $initials = substr($initials, 0, 2);
             </a>
         </li>
 
+        <li class="sidebar-item <?php echo $current_page === 'requests.php' ? 'active' : ''; ?>">
+            <a href="requests.php" class="sidebar-link">
+                <i class="fa-solid fa-file-shield"></i>
+                <span>Permission Requests</span>
+            </a>
+        </li>
+
         <?php if (has_access('tech') && get_user_role() !== 'Faculty Coordinator' && get_user_role() !== 'Student Coordinator'): ?>
             <li class="sidebar-item <?php echo $current_page === 'tech_module.php' ? 'active' : ''; ?>">
                 <a href="tech_module.php" class="sidebar-link">

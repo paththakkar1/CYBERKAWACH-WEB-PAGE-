@@ -4,6 +4,85 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// JWT Security Constant & Helpers
+define('JWT_SECRET', 'cyberkavach_super_secret_signing_key_2026');
+
+function jwt_encode($payload, $expiry = 3600) {
+    $header = json_encode(['alg' => 'HS256', 'typ' => 'JWT']);
+    $payload['exp'] = time() + $expiry;
+    
+    $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
+    $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
+    
+    $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, JWT_SECRET, true);
+    $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+    
+    return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+}
+
+function jwt_decode($jwt) {
+    if (empty($jwt)) return false;
+    $parts = explode('.', $jwt);
+    if (count($parts) !== 3) return false;
+    list($header, $payload, $signature) = $parts;
+    
+    $sigToCheck = hash_hmac('sha256', $header . "." . $payload, JWT_SECRET, true);
+    $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($sigToCheck));
+    
+    if (!hash_equals($base64UrlSignature, $signature)) return false;
+    
+    $decodedPayload = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $payload)), true);
+    if (isset($decodedPayload['exp']) && $decodedPayload['exp'] < time()) return false;
+    
+    return $decodedPayload;
+}
+
+function sync_jwt_session() {
+    $jwt = $_COOKIE['cyberkavach_jwt'] ?? null;
+    $refresh = $_COOKIE['cyberkavach_refresh'] ?? null;
+
+    if ($jwt) {
+        $payload = jwt_decode($jwt);
+        if ($payload) {
+            $_SESSION['user_id'] = $payload['user_id'];
+            $_SESSION['user_name'] = $payload['name'];
+            $_SESSION['user_role'] = $payload['role'];
+            $_SESSION['user_points'] = $payload['points'] ?? 0;
+            return true;
+        }
+    }
+
+    if ($refresh) {
+        $payload = jwt_decode($refresh);
+        if ($payload && isset($payload['refresh']) && $payload['refresh'] === true) {
+            $new_payload = [
+                'user_id' => $payload['user_id'],
+                'name' => $payload['name'],
+                'role' => $payload['role'],
+                'points' => $payload['points'] ?? 0
+            ];
+            $new_jwt = jwt_encode($new_payload, 3600);
+            setcookie('cyberkavach_jwt', $new_jwt, time() + 3600, '/', '', false, true);
+            
+            $_SESSION['user_id'] = $payload['user_id'];
+            $_SESSION['user_name'] = $payload['name'];
+            $_SESSION['user_role'] = $payload['role'];
+            $_SESSION['user_points'] = $payload['points'] ?? 0;
+            return true;
+        }
+    }
+
+    if (!isset($_COOKIE['cyberkavach_jwt']) && !isset($_COOKIE['cyberkavach_refresh'])) {
+        unset($_SESSION['user_id']);
+        unset($_SESSION['user_name']);
+        unset($_SESSION['user_role']);
+        unset($_SESSION['user_points']);
+    }
+    return false;
+}
+
+sync_jwt_session();
+
 // System Constants
 define('APP_NAME', 'CyberKavach OS');
 define('DB_FILE', __DIR__ . '/cyberkavach.db');

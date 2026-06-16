@@ -1175,6 +1175,11 @@ if ($flash):
                         </a>
                     </li>
                     <li>
+                        <a href="requests.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
+                            <i class="fa-solid fa-file-shield"></i> Permission Requests Portal
+                        </a>
+                    </li>
+                    <li>
                         <a href="events.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
                             <i class="fa-solid fa-calendar-plus"></i> Schedule Security Event
                         </a>
@@ -1194,6 +1199,11 @@ if ($flash):
                     <li>
                         <a href="events.php" class="btn btn-success btn-block" style="font-size:0.75rem; justify-content: flex-start;">
                             <i class="fa-solid fa-calendar-plus"></i> Create New Event
+                        </a>
+                    </li>
+                    <li>
+                        <a href="requests.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
+                            <i class="fa-solid fa-file-shield"></i> Permission Requests Portal
                         </a>
                     </li>
                     <li>
@@ -1219,6 +1229,11 @@ if ($flash):
                         </a>
                     </li>
                     <li>
+                        <a href="requests.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
+                            <i class="fa-solid fa-file-shield"></i> Raise Permission Request
+                        </a>
+                    </li>
+                    <li>
                         <a href="tickets.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
                             <i class="fa-solid fa-ticket"></i> Open IT Support Tickets
                         </a>
@@ -1241,6 +1256,11 @@ if ($flash):
                         </a>
                     </li>
                     <li>
+                        <a href="requests.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
+                            <i class="fa-solid fa-file-shield"></i> Raise Permission Request
+                        </a>
+                    </li>
+                    <li>
                         <a href="announcements.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
                             <i class="fa-solid fa-bullhorn"></i> Compose Club Notice
                         </a>
@@ -1255,6 +1275,11 @@ if ($flash):
                     <li>
                         <a href="social_module.php" class="btn btn-danger btn-block" style="font-size:0.75rem; justify-content: flex-start;">
                             <i class="fa-solid fa-hashtag"></i> Open Media Release Desk
+                        </a>
+                    </li>
+                    <li>
+                        <a href="requests.php" class="btn btn-secondary btn-block" style="font-size:0.75rem; justify-content: flex-start;">
+                            <i class="fa-solid fa-file-shield"></i> Raise Permission Request
                         </a>
                     </li>
                 </ul>

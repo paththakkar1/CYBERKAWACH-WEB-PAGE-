@@ -36,7 +36,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'Your account has been suspended. Contact support.';
                     log_event($user['id'], 'Login Blocked', 'Attempted login with Suspended status');
                 } else {
-                    // Successful login
+                    // Generate JWT access token (valid 1 hour)
+                    $payload_access = [
+                        'user_id' => $user['id'],
+                        'name' => $user['name'],
+                        'role' => $user['role'],
+                        'points' => $user['points']
+                    ];
+                    $jwt = jwt_encode($payload_access, 3600);
+                    
+                    // Generate JWT refresh token (valid 30 days)
+                    $payload_refresh = [
+                        'user_id' => $user['id'],
+                        'name' => $user['name'],
+                        'role' => $user['role'],
+                        'points' => $user['points'],
+                        'refresh' => true
+                    ];
+                    $refresh = jwt_encode($payload_refresh, 3600 * 24 * 30);
+                    
+                    // Set cookies (HTTP-Only)
+                    setcookie('cyberkavach_jwt', $jwt, time() + 3600, '/', '', false, true);
+                    setcookie('cyberkavach_refresh', $refresh, time() + (3600 * 24 * 30), '/', '', false, true);
+
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['user_name'] = $user['name'];
                     $_SESSION['user_role'] = $user['role'];
@@ -106,13 +128,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="form-group" style="margin-bottom: 25px;">
-                <label for="password" class="form-label">Passphrase</label>
-                <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" required>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label for="password" class="form-label" style="margin-bottom: 0;">Passphrase</label>
+                    <a href="forgot_password.php" class="text-cyan" style="font-size: 0.75rem; font-weight: 500;">Forgot Passphrase?</a>
+                </div>
+                <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" required style="margin-top: 5px;">
             </div>
 
             <button type="submit" class="btn btn-primary btn-block">
                 <i class="fa-solid fa-key"></i> Authenticate
             </button>
+
+            <div style="margin: 15px 0; text-align: center; font-size: 0.8rem; color: var(--text-muted); position: relative;">
+                <span style="background: var(--bg-main); padding: 0 10px; position: relative; z-index: 1;">OR CONNECT SECURELY VIA</span>
+                <div style="position: absolute; top: 50%; left: 0; right: 0; border-top: 1px solid var(--border-glow); z-index: 0;"></div>
+            </div>
+
+            <a href="sso_callback.php" class="btn btn-secondary btn-block" style="text-decoration: none; border: 1px solid var(--border-glow); background: #ffffff; color: #000000;">
+                <i class="fa-brands fa-google text-danger"></i> Institutional Google SSO
+            </a>
         </form>
         
         <div style="margin-top: 25px; text-align: center; font-size: 0.85rem;">
