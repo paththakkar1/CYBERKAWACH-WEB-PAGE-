@@ -164,43 +164,94 @@ try {
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
         );
+
+        CREATE TABLE IF NOT EXISTS tech_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            request_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            resource_name TEXT,
+            status TEXT NOT NULL DEFAULT 'Pending',
+            approved_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS content_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            content_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            scheduled_date TEXT,
+            status TEXT NOT NULL DEFAULT 'Draft',
+            approved_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS social_campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            platform TEXT NOT NULL,
+            content TEXT NOT NULL,
+            scheduled_time TEXT,
+            status TEXT NOT NULL DEFAULT 'Draft',
+            approved_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS interest_forms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            interest_area TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
     ");
 
-    // Seed Initial Data if table 'users' is empty
-    $userCount = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
-    if ($userCount == 0) {
-        // Seed Users
-        // Admin
-        $stmt = $db->prepare("INSERT INTO users (name, email, password, role, status, points) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            'Super Admin Founder',
-            'admin@cyberkavach.org',
-            password_hash('Admin@12345', PASSWORD_DEFAULT),
-            'Admin',
-            'Active',
-            100
-        ]);
-        $adminId = $db->lastInsertId();
-        
-        // Core Member
-        $stmt->execute([
-            'Core Member Priya',
-            'core@cyberkavach.org',
-            password_hash('Core@12345', PASSWORD_DEFAULT),
-            'Core',
-            'Active',
-            250
-        ]);
-        
-        // Regular Member
-        $stmt->execute([
-            'Club Member Rohan',
-            'member@cyberkavach.org',
-            password_hash('Member@12345', PASSWORD_DEFAULT),
-            'Member',
-            'Active',
-            50
-        ]);
+    // Seed/Migrate the 7 test accounts
+    $newAccounts = [
+        ['Super Admin Founder', 'admin@cyberkavach.org', 'Admin@12345', 'Faculty Coordinator', 'Active', 100],
+        ['Core Coordinator Priya', 'core@cyberkavach.org', 'Core@12345', 'Student Coordinator', 'Active', 250],
+        ['Tech Coordinator Kabir', 'tech@cyberkavach.org', 'Tech@12345', 'Tech Coordinator', 'Active', 150],
+        ['Content Coordinator Aisha', 'content@cyberkavach.org', 'Content@12345', 'Content Coordinator', 'Active', 120],
+        ['Social Coordinator Maya', 'social@cyberkavach.org', 'Social@12345', 'Social Media Coord.', 'Active', 80],
+        ['Club Member Rohan', 'member@cyberkavach.org', 'Member@12345', 'Club Member', 'Active', 50],
+        ['Guest Student Sam', 'guest@cyberkavach.org', 'Guest@12345', 'Student/Participant', 'Active', 0]
+    ];
+    
+    foreach ($newAccounts as $acc) {
+        $stmtCheckAcc = $db->prepare("SELECT id, role FROM users WHERE email = ? LIMIT 1");
+        $stmtCheckAcc->execute([$acc[1]]);
+        $existingUser = $stmtCheckAcc->fetch();
+        if (!$existingUser) {
+            $stmtInsertAcc = $db->prepare("INSERT INTO users (name, email, password, role, status, points) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmtInsertAcc->execute([
+                $acc[0],
+                $acc[1],
+                password_hash($acc[2], PASSWORD_DEFAULT),
+                $acc[3],
+                $acc[4],
+                $acc[5]
+            ]);
+        } else {
+            $stmtUpdateRole = $db->prepare("UPDATE users SET role = ? WHERE id = ?");
+            $stmtUpdateRole->execute([$acc[3], $existingUser['id']]);
+        }
+    }
+
+    $adminId = $db->query("SELECT id FROM users WHERE email = 'admin@cyberkavach.org'")->fetchColumn();
+
+    // Seed Announcements if empty
+    $annCount = $db->query("SELECT COUNT(*) FROM announcements")->fetchColumn();
+    if ($annCount == 0) {
         
         // Seed Announcements
         $stmtAnn = $db->prepare("INSERT INTO announcements (title, content, priority, created_by) VALUES (?, ?, ?, ?)");

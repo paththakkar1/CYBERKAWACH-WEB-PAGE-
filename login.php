@@ -121,11 +121,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         
         <div style="margin-top: 20px; border-top: 1px solid var(--border-glow); padding-top: 15px; font-size: 0.75rem; text-align: center; color: var(--text-muted);">
-            <div style="margin-bottom: 5px;"><i class="fa-solid fa-triangle-exclamation text-warning"></i> <strong>Initial Accounts:</strong></div>
-            <div style="font-family: monospace; line-height: 1.4;">
-                Admin: admin@cyberkavach.org / Admin@12345<br>
-                Core: core@cyberkavach.org / Core@12345<br>
-                Member: member@cyberkavach.org / Member@12345
+            <div style="margin-bottom: 5px;"><i class="fa-solid fa-triangle-exclamation text-warning"></i> <strong>Initial Test Accounts:</strong></div>
+            <div style="font-family: monospace; line-height: 1.4; text-align: left; display: inline-block;">
+                Faculty Coord: admin@cyberkavach.org / Admin@12345<br>
+                Student Coord: core@cyberkavach.org / Core@12345<br>
+                Tech Coord: tech@cyberkavach.org / Tech@12345<br>
+                Content Coord: content@cyberkavach.org / Content@12345<br>
+                Social Coord: social@cyberkavach.org / Social@12345<br>
+                Club Member: member@cyberkavach.org / Member@12345<br>
+                Participant/Guest: guest@cyberkavach.org / Guest@12345
             </div>
         </div>
     </div>

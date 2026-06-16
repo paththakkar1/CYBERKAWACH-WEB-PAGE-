@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Insert New User
                 // Default status is 'Pending' for security. We will allow logging in once approved.
                 $hashed_pass = password_hash($password, PASSWORD_DEFAULT);
-                $stmtInsert = $db->prepare("INSERT INTO users (name, email, password, role, status, points) VALUES (?, ?, ?, 'Member', 'Pending', 0)");
+                $stmtInsert = $db->prepare("INSERT INTO users (name, email, password, role, status, points) VALUES (?, ?, ?, 'Student/Participant', 'Pending', 0)");
                 $stmtInsert->execute([$name, $email, $hashed_pass]);
                 $newUserId = $db->lastInsertId();
 

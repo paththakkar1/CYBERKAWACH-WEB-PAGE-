@@ -62,16 +62,64 @@ $initials = substr($initials, 0, 2);
             </a>
         </li>
 
-        <?php if ($user_role === 'Core' || $user_role === 'Admin'): ?>
+        <?php if (has_access('tech') && get_user_role() !== 'Faculty Coordinator' && get_user_role() !== 'Student Coordinator'): ?>
+            <li class="sidebar-item <?php echo $current_page === 'tech_module.php' ? 'active' : ''; ?>">
+                <a href="tech_module.php" class="sidebar-link">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span>Tech Module</span>
+                </a>
+            </li>
+        <?php endif; ?>
+
+        <?php if (has_access('content') && get_user_role() !== 'Faculty Coordinator' && get_user_role() !== 'Student Coordinator'): ?>
+            <li class="sidebar-item <?php echo $current_page === 'content_module.php' ? 'active' : ''; ?>">
+                <a href="content_module.php" class="sidebar-link">
+                    <i class="fa-solid fa-newspaper"></i>
+                    <span>Content Module</span>
+                </a>
+            </li>
+        <?php endif; ?>
+
+        <?php if (has_access('social') && get_user_role() !== 'Faculty Coordinator' && get_user_role() !== 'Student Coordinator'): ?>
+            <li class="sidebar-item <?php echo $current_page === 'social_module.php' ? 'active' : ''; ?>">
+                <a href="social_module.php" class="sidebar-link">
+                    <i class="fa-solid fa-share-nodes"></i>
+                    <span>Social Module</span>
+                </a>
+            </li>
+        <?php endif; ?>
+
+        <?php if (has_role('Core')): ?>
             <li class="sidebar-item <?php echo $current_page === 'approvals.php' ? 'active' : ''; ?>">
                 <a href="approvals.php" class="sidebar-link text-purple">
                     <i class="fa-solid fa-square-check"></i>
                     <span>Approvals Board</span>
                 </a>
             </li>
+            
+            <?php if (in_array(get_user_role(), ['Faculty Coordinator', 'Student Coordinator'])): ?>
+                <li class="sidebar-item <?php echo $current_page === 'tech_module.php' ? 'active' : ''; ?>">
+                    <a href="tech_module.php" class="sidebar-link">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span>Tech Module</span>
+                    </a>
+                </li>
+                <li class="sidebar-item <?php echo $current_page === 'content_module.php' ? 'active' : ''; ?>">
+                    <a href="content_module.php" class="sidebar-link">
+                        <i class="fa-solid fa-newspaper"></i>
+                        <span>Content Module</span>
+                    </a>
+                </li>
+                <li class="sidebar-item <?php echo $current_page === 'social_module.php' ? 'active' : ''; ?>">
+                    <a href="social_module.php" class="sidebar-link">
+                        <i class="fa-solid fa-share-nodes"></i>
+                        <span>Social Module</span>
+                    </a>
+                </li>
+            <?php endif; ?>
         <?php endif; ?>
 
-        <?php if ($user_role === 'Admin'): ?>
+        <?php if (has_role('Admin')): ?>
             <li class="sidebar-item <?php echo $current_page === 'admin.php' ? 'active' : ''; ?>">
                 <a href="admin.php" class="sidebar-link text-pink">
                     <i class="fa-solid fa-user-gear"></i>
@@ -98,8 +146,12 @@ $initials = substr($initials, 0, 2);
             </div>
             <div class="sidebar-user-role">
                 <i class="fa-solid <?php 
-                    echo $user_role === 'Admin' ? 'fa-key text-pink' : 
-                        ($user_role === 'Core' ? 'fa-star text-purple' : 'fa-user text-cyan'); 
+                    echo $user_role === 'Faculty Coordinator' ? 'fa-key text-pink' : 
+                        ($user_role === 'Student Coordinator' ? 'fa-star text-purple' : 
+                        ($user_role === 'Tech Coordinator' ? 'fa-microchip text-cyan' : 
+                        ($user_role === 'Content Coordinator' ? 'fa-pen-nib text-cyan' : 
+                        ($user_role === 'Social Media Coord.' ? 'fa-share-nodes text-warning' : 
+                        ($user_role === 'Club Member' ? 'fa-user-ninja text-success' : 'fa-user text-muted'))))); 
                 ?>"></i>
                 <span><?php echo $user_role; ?></span>
             </div>

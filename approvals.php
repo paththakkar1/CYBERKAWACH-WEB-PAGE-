@@ -182,7 +182,7 @@ try {
 // 3. Fetch active users (to select for spotlight nomination)
 $active_members = [];
 try {
-    $stmtAM = $db->query("SELECT id, name, email FROM users WHERE status = 'Active' AND role = 'Member' ORDER BY name ASC");
+    $stmtAM = $db->query("SELECT id, name, email FROM users WHERE status = 'Active' AND role = 'Club Member' ORDER BY name ASC");
     $active_members = $stmtAM->fetchAll();
 } catch (PDOException $e) {}
 

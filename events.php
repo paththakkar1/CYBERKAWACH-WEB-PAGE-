@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_event'])) {
             $error = 'Please fill all fields and provide a valid capacity.';
         } else {
             try {
-                $status = ($user_role === 'Admin') ? 'Approved' : 'Pending Approval';
+                $status = has_role('Admin') ? 'Approved' : 'Pending Approval';
                 $stmt = $db->prepare("INSERT INTO events (title, description, date, time, location, max_participants, points_reward, created_by, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$title, $description, $date, $time, $location, $max_participants, $points_reward, $user_id, $status]);
                 

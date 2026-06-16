@@ -88,7 +88,6 @@ function get_user_role() {
 
 /**
  * Check if user has specific role or higher
- * Roles order: Guest < Member < Core < Admin
  * @param string $role Required role
  * @return bool
  */
@@ -98,12 +97,73 @@ function has_role($role) {
     }
     
     $current_role = get_user_role();
-    $roles_hierarchy = ['Member' => 1, 'Core' => 2, 'Admin' => 3];
+    
+    // Map legacy role requests ('Admin', 'Core', 'Member') to new 7 roles
+    if ($role === 'Admin') {
+        return $current_role === 'Faculty Coordinator';
+    }
+    if ($role === 'Core') {
+        return in_array($current_role, ['Faculty Coordinator', 'Student Coordinator']);
+    }
+    if ($role === 'Member') {
+        return $current_role !== 'Student/Participant';
+    }
+    
+    $roles_hierarchy = [
+        'Student/Participant' => 1,
+        'Club Member'         => 2,
+        'Social Media Coord.' => 3,
+        'Content Coordinator' => 4,
+        'Tech Coordinator'    => 5,
+        'Student Coordinator' => 6,
+        'Faculty Coordinator' => 7
+    ];
     
     $current_weight = $roles_hierarchy[$current_role] ?? 0;
     $required_weight = $roles_hierarchy[$role] ?? 0;
     
     return $current_weight >= $required_weight;
+}
+
+/**
+ * Check if the user has access to a specific module or permission level
+ * @param string $access_type 'all' | 'high' | 'tech' | 'content' | 'social' | 'member' | 'guest'
+ * @return bool
+ */
+function has_access($access_type) {
+    if (!is_logged_in()) {
+        return false;
+    }
+    
+    $role = get_user_role();
+    
+    if ($role === 'Faculty Coordinator') {
+        return true;
+    }
+    
+    if ($role === 'Student Coordinator') {
+        return in_array($access_type, ['high', 'tech', 'content', 'social', 'member', 'guest']);
+    }
+    
+    if ($access_type === 'tech') {
+        return $role === 'Tech Coordinator';
+    }
+    if ($access_type === 'content') {
+        return $role === 'Content Coordinator';
+    }
+    if ($access_type === 'social') {
+        return $role === 'Social Media Coord.';
+    }
+    
+    if ($access_type === 'member') {
+        return in_array($role, ['Club Member', 'Tech Coordinator', 'Content Coordinator', 'Social Media Coord.']);
+    }
+    
+    if ($access_type === 'guest') {
+        return true;
+    }
+    
+    return false;
 }
 
 /**

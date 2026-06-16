@@ -68,15 +68,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'status') {
     redirect('admin.php');
 }
 
-// 3. Change Role (Member / Core / Admin)
+// 3. Change Role (7 Roles Support)
 if (isset($_GET['action']) && $_GET['action'] === 'role') {
     $target_id = intval($_GET['id']);
     $new_role = sanitize($_GET['value'] ?? '');
     $csrf_token = $_GET['csrf_token'] ?? '';
     
+    $allowed_roles = [
+        'Student/Participant',
+        'Club Member',
+        'Social Media Coord.',
+        'Content Coordinator',
+        'Tech Coordinator',
+        'Student Coordinator',
+        'Faculty Coordinator'
+    ];
+    
     if (!verify_csrf_token($csrf_token)) {
         set_flash_message('error', 'Security check failed.');
-    } elseif (!in_array($new_role, ['Member', 'Core', 'Admin'])) {
+    } elseif (!in_array($new_role, $allowed_roles)) {
         set_flash_message('error', 'Invalid role selection.');
     } else {
         try {
@@ -211,12 +221,29 @@ include __DIR__ . '/includes/header.php';
                                                 <a href="admin.php?action=status&id=<?php echo $usr['id']; ?>&value=Active&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-success" style="padding:4px 8px; font-size:0.7rem;"><i class="fa-solid fa-circle-check"></i> Reactivate</a>
                                             <?php endif; ?>
 
-                                            <!-- Role elevations -->
-                                            <?php if ($usr['role'] === 'Member'): ?>
-                                                <a href="admin.php?action=role&id=<?php echo $usr['id']; ?>&value=Core&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;"><i class="fa-solid fa-star"></i> Elevate to Core</a>
-                                            <?php elseif ($usr['role'] === 'Core'): ?>
-                                                <a href="admin.php?action=role&id=<?php echo $usr['id']; ?>&value=Member&csrf_token=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;" onclick="return confirm('Demote this core member back to regular club member?');"><i class="fa-solid fa-user-minus"></i> Demote to Member</a>
-                                            <?php endif; ?>
+                                            <!-- Role selection dropdown -->
+                                            <form action="admin.php" method="GET" style="display:inline-flex; align-items:center; margin:0;">
+                                                <input type="hidden" name="action" value="role">
+                                                <input type="hidden" name="id" value="<?php echo $usr['id']; ?>">
+                                                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                                <select name="value" onchange="if(confirm('Change role of this user?')) this.form.submit();" class="form-control" style="padding:4px 8px; font-size:0.7rem; height:auto; width:150px; display:inline-block; border-color:var(--border-glow);">
+                                                    <?php 
+                                                    $roles_list = [
+                                                        'Student/Participant',
+                                                        'Club Member',
+                                                        'Social Media Coord.',
+                                                        'Content Coordinator',
+                                                        'Tech Coordinator',
+                                                        'Student Coordinator',
+                                                        'Faculty Coordinator'
+                                                    ];
+                                                    foreach ($roles_list as $rl) {
+                                                        $sel = ($usr['role'] === $rl) ? 'selected' : '';
+                                                        echo "<option value='$rl' $sel>$rl</option>";
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </form>
                                         </div>
                                     <?php else: ?>
                                         <span class="text-muted" style="font-size:0.75rem; font-style:italic;">Protected Owner Account</span>
